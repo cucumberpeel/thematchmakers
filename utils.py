@@ -19,7 +19,7 @@ def load_benchmark_data(
         gold: Name of the gold column
     """
     try:
-        raw_data = pd.read_csv(os.path.join("data", name, "gt.csv"))
+        raw_data = pd.read_csv(os.path.join("data", "benchmark", name, "gt.csv"))
     except Exception as e:
         print(f"Error loading data from {name}: {e}")
         return []
@@ -56,7 +56,7 @@ def load_dtt_data(
         gold: Name of the gold column
     """
     try:
-        raw_data = pd.read_csv(os.path.join("data", name, "ground truth.csv"))
+        raw_data = pd.read_csv(os.path.join("data", "FF_AJ", name, "ground truth.csv"))
     except Exception as e:
         print(f"Error loading data from {name}: {e}")
         return []
