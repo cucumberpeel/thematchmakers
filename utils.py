@@ -1,16 +1,21 @@
+import os
 import pandas as pd
 from typing import List, Dict, Optional
 
-def load_data(
-    path: str,
+def load_benchmark_data(
+    name: str,
     source: str = 'title_l',
     target: str = 'title_r',
     gold: Optional[str] = None
 ) -> List[Dict]:
+    """
+    Loads AutoFJ benchmark data from dataset name.
+    Returns list of dicts with source value, gold value, and list of target values.
+    """
     try:
-        raw_data = pd.read_csv(path)
+        raw_data = pd.read_csv(os.path.join("data", name, "gt.csv"))
     except Exception as e:
-        print(f"Error loading data from {path}: {e}")
+        print(f"Error loading data from {name}: {e}")
         return []
     
     if gold is None:
