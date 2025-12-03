@@ -1,0 +1,12 @@
+{
+    "autofj": 
+        [
+            "Hospital",
+            "Country"
+        ],
+    "dtt-dxf":
+        [
+            "CityToCountry",
+            "ElementToSymbol"
+        ]
+}
