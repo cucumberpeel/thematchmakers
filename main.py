@@ -1,13 +1,63 @@
 from agent_lab import train_agent, evaluate_agent
 from dataset_formatter import read_datasets, split_datasets, print_datasets_info
-from algorithms import lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm
+from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
+shingles_algorithm, regex_algorithm, ip_country_matcher, ip_subnet_matcher, date_algorithm,
+numeric_algorithm, identity_algorithm, length_algorithm, prefix_algorithm, suffix_algorithm,
+range_algorithm, categorical_algorithm, boolean_algorithm, phone_algorithm, email_algorithm,
+url_algorithm, geo_pair_algorithm, currency_algorithm, name_algorithm, address_algorithm,
+zip_algorithm, credit_card_algorithm, ssn_algorithm, isbn_algorithm, mac_address_algorithm,
+color_algorithm, rgb_algorithm, hex_algorithm, percentage_algorithm, filepath_algorithm, uuid_algorithm,
+inches_to_cm_algorithm, cm_to_inches_algorithm, weight_kg_to_lb_algorithm, weight_lb_to_kg_algorithm,
+temperature_c_to_f_algorithm, temperature_f_to_c_algorithm, accent_fold_algorithm,
+light_stem_algorithm)
+
+
 from feature_extractor import FEATURE_DIM
 
 
 def evaluate_rl_method(train_dataset, test_dataset):
     primitives = [("lexical", lexical_algorithm), 
                   ("semantic", semantic_algorithm), 
-                  ("llm", llm_reasoning_algorithm)
+                  ("llm", llm_reasoning_algorithm),
+                  ("shingles", shingles_algorithm),
+                  ("regex", regex_algorithm),
+                    ("ip_country", ip_country_matcher),
+                    ("ip_subnet", ip_subnet_matcher),
+                    ("date", date_algorithm),
+                    ("numeric", numeric_algorithm),
+                    ("identity", identity_algorithm),
+                    ("length", length_algorithm),
+                    ("prefix", prefix_algorithm),
+                    ("suffix", suffix_algorithm),
+                    ("range", range_algorithm),
+                    ("categorical", categorical_algorithm),
+                    ("boolean", boolean_algorithm),
+                    ("phone", phone_algorithm),
+                    ("email", email_algorithm),
+                    ("url", url_algorithm),
+                    ("geo_pair", geo_pair_algorithm),
+                    ("currency", currency_algorithm),
+                    ("name", name_algorithm),
+                    ("address", address_algorithm),
+                    ("zip", zip_algorithm),
+                    ("credit_card", credit_card_algorithm),
+                    ("ssn", ssn_algorithm),
+                    ("isbn", isbn_algorithm),
+                    ("mac_address", mac_address_algorithm),
+                    ("color", color_algorithm),
+                    ("rgb", rgb_algorithm),
+                    ("hex", hex_algorithm),
+                    ("percentage", percentage_algorithm),
+                    ("filepath", filepath_algorithm),
+                    ("uuid", uuid_algorithm),
+                    ("inches_to_cm", inches_to_cm_algorithm),
+                    ("cm_to_inches", cm_to_inches_algorithm),
+                    ("weight_kg_to_lb", weight_kg_to_lb_algorithm),
+                    ("weight_lb_to_kg", weight_lb_to_kg_algorithm),
+                    ("temperature_c_to_f", temperature_c_to_f_algorithm),
+                    ("temperature_f_to_c", temperature_f_to_c_algorithm),
+                    ("accent_fold", accent_fold_algorithm),
+                    ("light_stem", light_stem_algorithm)                
                   ]
     primitive_names = [name for name, _ in primitives]
     primitive_methods = [method for _, method in primitives]
@@ -45,7 +95,46 @@ def evaluate_rl_method(train_dataset, test_dataset):
 def evaluate_individual_methods(test_dataset):
     primitives = [("lexical", lexical_algorithm), 
                   ("semantic", semantic_algorithm), 
-                  ("llm", llm_reasoning_algorithm)
+                  ("llm", llm_reasoning_algorithm),
+                    ("shingles", shingles_algorithm),
+                    ("regex", regex_algorithm),
+                    ("ip_country", ip_country_matcher),
+                    ("ip_subnet", ip_subnet_matcher),
+                    ("date", date_algorithm),
+                    ("numeric", numeric_algorithm),
+                    ("identity", identity_algorithm),
+                    ("length", length_algorithm),
+                    ("prefix", prefix_algorithm),
+                    ("suffix", suffix_algorithm),
+                    ("range", range_algorithm),
+                    ("categorical", categorical_algorithm),
+                    ("boolean", boolean_algorithm),
+                    ("phone", phone_algorithm),
+                    ("email", email_algorithm),
+                    ("url", url_algorithm),
+                    ("geo_pair", geo_pair_algorithm),
+                    ("currency", currency_algorithm),
+                    ("name", name_algorithm),
+                    ("address", address_algorithm),
+                    ("zip", zip_algorithm),
+                    ("credit_card", credit_card_algorithm),
+                    ("ssn", ssn_algorithm),
+                    ("isbn", isbn_algorithm),
+                    ("mac_address", mac_address_algorithm),
+                    ("color", color_algorithm),
+                    ("rgb", rgb_algorithm),
+                    ("hex", hex_algorithm),
+                    ("percentage", percentage_algorithm),
+                    ("filepath", filepath_algorithm),
+                    ("uuid", uuid_algorithm),
+                    ("inches_to_cm", inches_to_cm_algorithm),
+                    ("cm_to_inches", cm_to_inches_algorithm),
+                    ("weight_kg_to_lb", weight_kg_to_lb_algorithm),
+                    ("weight_lb_to_kg", weight_lb_to_kg_algorithm),
+                    ("temperature_c_to_f", temperature_c_to_f_algorithm),
+                    ("temperature_f_to_c", temperature_f_to_c_algorithm),
+                    ("accent_fold", accent_fold_algorithm),
+                    ("light_stem", light_stem_algorithm)
         ]
 
     print("\nEvaluating individual methods...")
