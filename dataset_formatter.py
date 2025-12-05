@@ -2,30 +2,9 @@ import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# def read_datasets_old():
-#     formatted_datasets = []
-#     dataset_paths = ['../data/Hospital/gt.csv', '../data/Country/gt.csv']
-
-#     for dataset_path in dataset_paths:
-#         raw_dataset = pd.read_csv(dataset_path)
-#         source_col = 'title_l'
-#         target_col = 'title_r'
-#         all_targets = raw_dataset['title_r'].unique().tolist()
-#         pairs = []
-#         for _, row in raw_dataset.iterrows():
-#             pairs.append({
-#                 'source_value': row[source_col],
-#                 'gold_value': row[target_col],
-#                 'target_values': all_targets,
-#             })
-#         formatted_datasets.append({'source_column': source_col,
-#                                    'target_column': target_col,
-#                                    'pairs': pairs})
-
-#     return formatted_datasets
-
-def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
-    formatted_datasets = []
+def read_split_datasets(autofj=True, ss=True, wt=True, kbwt=True, test_size=0.2, random_state=42):
+    train_datasets = []
+    test_datasets = []
 
     if autofj:
         # autofj datasets: 1 source + 1 target column per file
@@ -37,7 +16,7 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
             gt_files = [f for f in files if f == 'gt.csv']
             if len(gt_files) > 1:
                 print(f"Error: more than 1 ground truth file in {root}: {gt_files}")
-                return []
+                return [], []
             if gt_files:
                 autofj_count += 1
                 dataset_path = os.path.join(root, gt_files[0])
@@ -45,20 +24,30 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
                     raw_dataset = pd.read_csv(dataset_path)
                 except Exception as e:
                     print(f"Error reading {dataset_path}: {e}")
-                    return []
+                    return [], []
                 source_col = 'title_l'
                 target_col = 'title_r'
                 all_targets = raw_dataset[target_col].unique().tolist()
 
+                dataset_rows = []
                 for _, row in raw_dataset.iterrows():
-                    formatted_datasets.append({
+                    dataset_rows.append({
                         'source_column': source_col,
                         'target_column': target_col,
                         'source_value': str(row[source_col]),
                         'gold_value': str(row[target_col]),
                         'target_values': [str(t) for t in all_targets],
                     })
-        print(f"Read {autofj_count} datasets from {autofj_datasets_path}")
+                
+                if len(dataset_rows) > 0:
+                    train_rows, test_rows = train_test_split(
+                        dataset_rows, 
+                        test_size=test_size, 
+                        random_state=random_state
+                    )
+                    train_datasets.extend(train_rows)
+                    test_datasets.extend(test_rows)
+        print(f"Read and split {autofj_count} datasets from {autofj_datasets_path}")
     
     if ss:
         # spreadsheets datasets: 1 source + 1 target column per file
@@ -70,7 +59,7 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
             gt_files = [f for f in files if f == 'ground truth.csv']
             if len(gt_files) > 1:
                 print(f"Error: more than 1 ground truth file in {root}: {gt_files}")
-                return []
+                return [], []
             if gt_files:
                 ss_count += 1
                 dataset_path = os.path.join(root, gt_files[0])
@@ -78,20 +67,30 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
                     raw_dataset = pd.read_csv(dataset_path)
                 except Exception as e:
                     print(f"Error reading {dataset_path}: {e}")
-                    return []
+                    return [], []
                 source_col = 'source-value'
                 target_col = 'target-value'
                 all_targets = raw_dataset[target_col].unique().tolist()
 
+                dataset_rows = []
                 for _, row in raw_dataset.iterrows():
-                    formatted_datasets.append({
+                    dataset_rows.append({
                         'source_column': source_col,
                         'target_column': target_col,
                         'source_value': str(row[source_col]),
                         'gold_value': str(row[target_col]),
                         'target_values': [str(t) for t in all_targets],
                     })
-        print(f"Read {ss_count} datasets from {ss_datasets_path}")
+                
+                if len(dataset_rows) > 0:
+                    train_rows, test_rows = train_test_split(
+                        dataset_rows, 
+                        test_size=test_size, 
+                        random_state=random_state
+                    )
+                    train_datasets.extend(train_rows)
+                    test_datasets.extend(test_rows)
+        print(f"Read and split {ss_count} datasets from {ss_datasets_path}")
 
     if wt:
         # wt datasets: multiple columns per file, check rows.txt to find source and target
@@ -102,7 +101,7 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
             gt_files = [f for f in files if f == 'ground truth.csv']
             if len(gt_files) > 1:
                 print(f"Error: more than 1 ground truth file in {root}: {gt_files}")
-                return []
+                return [], []
             if gt_files:
                 # skip duplicate dataset
                 if (root.endswith("original")): continue
@@ -113,7 +112,7 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
                     raw_dataset = pd.read_csv(dataset_path)
                 except Exception as e:
                     print(f"Error reading {dataset_path}: {e}")
-                    return []
+                    return [], []
 
                 try:
                     with open(os.path.join(root, 'rows.txt'), 'r') as file:
@@ -124,25 +123,35 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
                         target_col = "target-" + target_postfix
                         if source_col not in all_cols:
                             print(f"Error in {dataset_path}: missing {source_col} from columns ({all_cols})")
-                            return []
+                            return [], []
                         if target_col not in all_cols:
                             print(f"Error in {dataset_path}: missing {target_col} from columns ({all_cols})")
-                            return []
+                            return [], []
                 except Exception as e:
                     print(f"Error parsing columns from {dataset_path}: {e}")
-                    return []
+                    return [], []
 
                 all_targets = raw_dataset[target_col].unique().tolist()
 
+                dataset_rows = []
                 for _, row in raw_dataset.iterrows():
-                    formatted_datasets.append({
+                    dataset_rows.append({
                         'source_column': source_col,
                         'target_column': target_col,
                         'source_value': str(row[source_col]),
                         'gold_value': str(row[target_col]),
                         'target_values': [str(t) for t in all_targets],
                     })
-        print(f"Read {wt_count} datasets from {wt_datasets_path}")
+                
+                if len(dataset_rows) > 0:
+                    train_rows, test_rows = train_test_split(
+                        dataset_rows, 
+                        test_size=test_size, 
+                        random_state=random_state
+                    )
+                    train_datasets.extend(train_rows)
+                    test_datasets.extend(test_rows)
+        print(f"Read and split {wt_count} datasets from {wt_datasets_path}")
     
     if kbwt:
         # kbwt datasets: 1 source + 1 target column per file
@@ -155,7 +164,7 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
             gt_files = [f for f in files if f == 'ground truth.csv']
             if len(gt_files) > 1:
                 print(f"Error: more than 1 ground truth file in {root}: {gt_files}")
-                return []
+                return [], []
             if gt_files:
                 kbwt_count += 1
                 dataset_path = os.path.join(root, gt_files[0])
@@ -163,29 +172,40 @@ def read_datasets(autofj=True, ss=True, wt=True, kbwt=True):
                     raw_dataset = pd.read_csv(dataset_path)
                 except Exception as e:
                     print(f"Error reading {dataset_path}: {e}")
-                    return []
+                    return [], []
 
                 source_cols = [col for col in raw_dataset.columns if col.startswith("source")]
                 target_cols = [col for col in raw_dataset.columns if col.startswith("target")]
                 if len(source_cols) > 1 or len(target_cols) > 1:
                     print(f"Error locating source-target columns: {raw_dataset.columns}")
-                    return []
+                    return [], []
                 source_col = source_cols[0]
                 target_col = target_cols[0]
                 all_targets = raw_dataset[target_col].unique().tolist()
 
+                dataset_rows = []
                 for _, row in raw_dataset.iterrows():
-                    formatted_datasets.append({
+                    dataset_rows.append({
                         'source_column': source_col,
                         'target_column': target_col,
                         'source_value': str(row[source_col]),
                         'gold_value': str(row[target_col]),
                         'target_values': [str(t) for t in all_targets],
                     })
-        print(f"Read {kbwt_count} datasets from {kbwt_datasets_path}")
+                
+                if len(dataset_rows) > 0:
+                    train_rows, test_rows = train_test_split(
+                        dataset_rows, 
+                        test_size=test_size, 
+                        random_state=random_state
+                    )
+                    train_datasets.extend(train_rows)
+                    test_datasets.extend(test_rows)
+        print(f"Read and split {kbwt_count} datasets from {kbwt_datasets_path}")
 
-    return formatted_datasets
-
+    print(f"Training data size: {len(train_datasets)}")
+    print(f"Test data size: {len(test_datasets)}")
+    return train_datasets, test_datasets
 
 def split_datasets(datasets, test_size=0.2, random_state=42):
     train_set, test_set = train_test_split(datasets, test_size=test_size, random_state=random_state)

@@ -1,5 +1,5 @@
 from agent_lab import train_agent, evaluate_agent
-from dataset_formatter import read_datasets, split_datasets, print_datasets_info
+from dataset_formatter import read_split_datasets
 from algorithms import lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm
 from feature_extractor import FEATURE_DIM
 
@@ -73,9 +73,9 @@ def evaluate_individual_methods(test_dataset):
         print(f"Method: {name}, Accuracy: {accuracy:.3f}")
 
 if __name__ == "__main__":
-    datasets = read_datasets()
+    train_dataset, test_dataset = read_split_datasets(autofj=True, ss=True, wt=True, kbwt=True)
     #print_datasets_info(datasets)
-    train_dataset, test_dataset = split_datasets(datasets, test_size=0.2)
+    # train_dataset, test_dataset = split_datasets(datasets, test_size=0.2)
 
     evaluate_individual_methods(test_dataset)
     evaluate_rl_method(train_dataset, test_dataset)
