@@ -3,3 +3,4 @@ numpy
 gymnasium
 scikit-learn
 bdi-kit
+rapidfuzz

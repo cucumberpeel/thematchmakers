@@ -57,9 +57,11 @@ class ValueMatchingEnv(gym.Env):
 
         self.steps_taken += 1
 
-        # TODO: Remove this hack when  everything is working
+        # For LLM action, assume worst-case (wrong) prediction instead of
+        # the previous oracle behaviour that returned the gold label.
+        # This prevents the agent from learning to always pick the LLM.
         if action == 2:  # LLM reasoning
-            predicted = self.gold  # Assume perfect prediction for LLM
+            predicted = None
         else:
             predicted = self.primitives[action](self.source, self.targets)
 
