@@ -2,6 +2,34 @@ from agent_environment import ValueMatchingEnv
 import numpy as np
 
 
+def compute_prf(golds, preds):
+    """Compute precision/recall/F1 treating None as an abstention."""
+    assert len(golds) == len(preds), "golds and preds must align"
+    if not golds:
+        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "accuracy": 0.0}
+
+    tp = fp = fn = tn = 0
+
+    for g, p in zip(golds, preds):
+        if p is None:
+            if g is None:
+                tn += 1
+            else:
+                fn += 1
+        else:
+            if p == g:
+                tp += 1
+            else:
+                fp += 1
+
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    accuracy = (tp + tn) / (tp + fp + fn + tn) if (tp + fp + fn + tn) else 0.0
+
+    return {"precision": precision, "recall": recall, "f1": f1, "accuracy": accuracy}
+
+
 # Helper function to convert numeric state vector to tuple (hashable for Q-table)
 def state_to_key(state):
         return tuple(state.round(3))  # round to reduce floating-point noise
@@ -114,6 +142,8 @@ def evaluate_agent(Q, primitives, primitive_names, test_dataset, feature_dim, ma
         'total_attempts': 0,
         'algorithm_usage': {i: 0 for i in primitive_names}
     }
+    golds = []
+    preds = []
     
     for sample in test_dataset:
         state = env.reset(
@@ -147,16 +177,24 @@ def evaluate_agent(Q, primitives, primitive_names, test_dataset, feature_dim, ma
         results['total_attempts'] += info['attempts']
         if info['correct']:
             results['correct'] += 1
+        golds.append(sample['gold_value'])
+        preds.append(info['predicted'])
 
         for used_algorithm in info['history']:
             if used_algorithm != -1:
                 results['algorithm_usage'][primitive_names[used_algorithm]] += 1
 
     # Print evaluation results
+    prf = compute_prf(golds, preds)
+
     print(f"Accuracy: {results['correct'] / results['total']:.3f}")
+    print(f"Precision: {prf['precision']:.3f}")
+    print(f"Recall: {prf['recall']:.3f}")
+    print(f"F1: {prf['f1']:.3f}")
     print(f"Average Attempts: {results['total_attempts'] / results['total']:.3f}")
     print(f"Algorithm Usage: {results['algorithm_usage']}")
     
+    results.update(prf)
     return results
 
 

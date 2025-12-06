@@ -1,4 +1,4 @@
-from agent_lab import train_agent, evaluate_agent
+from agent_lab import train_agent, evaluate_agent, compute_prf, state_to_key
 from dataset_formatter import read_split_datasets
 from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
 shingles_algorithm, regex_algorithm, ip_matcher, date_algorithm,
@@ -102,6 +102,8 @@ def evaluate_individual_methods(test_dataset):
     for name, method in primitives:
         correct = 0
         total = len(test_dataset)
+        golds = []
+        preds = []
         for test_input in test_dataset:
             source_value = test_input['source_value']
             target_values = test_input['target_values']
@@ -119,8 +121,14 @@ def evaluate_individual_methods(test_dataset):
 
             if prediction == gold_value:
                 correct += 1
+            golds.append(gold_value)
+            preds.append(prediction)
         accuracy = correct / total
-        print(f"Method: {name}, Accuracy: {accuracy:.3f}")
+        prf = compute_prf(golds, preds)
+        print(
+            f"Method: {name}, Accuracy: {accuracy:.3f}, "
+            f"Precision: {prf['precision']:.3f}, Recall: {prf['recall']:.3f}, F1: {prf['f1']:.3f}"
+        )
 
 if __name__ == "__main__":
     train_dataset, test_dataset = read_split_datasets(autofj=True, ss=True, wt=True, kbwt=True)
