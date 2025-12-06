@@ -1,10 +1,9 @@
 from agent_environment import ValueMatchingEnv
 from ray.rllib.algorithms.ppo import PPOConfig
-import numpy as np
 
 
-def train_agent(primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps):
-    algo = (
+def make_config(primitives, primitive_costs, dataset, feature_dim, max_steps):
+    config = (
         PPOConfig()
         .environment(
             env=ValueMatchingEnv,
@@ -30,8 +29,12 @@ def train_agent(primitives, primitive_names, primitive_costs, dataset, feature_d
             train_batch_size=400,
             num_sgd_iter=10,
         )
-        .build()
     )
+    return config
+
+def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps):
+    config = make_config(primitives, primitive_costs, dataset, feature_dim, max_steps)
+    algo = config.build()
     
     for i in range(3):
         result = algo.train()
@@ -43,6 +46,15 @@ def train_agent(primitives, primitive_names, primitive_costs, dataset, feature_d
             reward = result["episode_reward_mean"]
             print(f"Iteration {i}: Reward = {reward}")
     
+    algo.save(checkpoint_dir=checkpoint_dir)
+
+    return algo
+
+def load_agent(checkpoint_dir, primitives, primitive_costs, dataset, feature_dim, max_steps):
+    config = make_config(primitives, primitive_costs, dataset, feature_dim, max_steps)
+    algo = config.build()
+    algo.restore(checkpoint_dir)
+
     return algo
 
 def evaluate_agent(algo, primitives, primitive_names, primitive_costs, test_dataset, feature_dim, max_steps):
@@ -79,6 +91,7 @@ def evaluate_agent(algo, primitives, primitive_names, primitive_costs, test_data
             next_state, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             state = next_state
+            print(f"Predicted: {info['predicted']}, Correct: {info['correct']}, Attempts: {info['attempts']}")
         
         # Record results
         results['total'] += 1

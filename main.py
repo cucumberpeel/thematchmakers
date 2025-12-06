@@ -1,4 +1,5 @@
-from agent_lab import train_agent, evaluate_agent
+import os
+from agent_lab import train_agent, load_agent, evaluate_agent
 from dataset_formatter import read_split_datasets
 from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
 shingles_algorithm, regex_algorithm, ip_matcher, date_algorithm,
@@ -39,24 +40,37 @@ primitives = [
     ("light_stem", light_stem_algorithm, 'light')
 ]
 
-def evaluate_rl_method(train_dataset, test_dataset):
+def evaluate_rl_method(train_dataset, test_dataset, load_checkpoint=True, checkpoint_dir="model_checkpoint"):
+    checkpoint_dir = os.path.join(os.path.dirname(__file__), checkpoint_dir)
     primitive_names = [name for name, _, _ in primitives]
     primitive_methods = [method for _, method, _ in primitives]
     primitive_costs = [general_costs[cost] for _, _, cost in primitives]
 
     max_steps = 2
     feature_dim = FEATURE_DIM
-     
-    # Train agent
-    print("Training agent...")
-    algo = train_agent(
-        primitives=primitive_methods,
-        primitive_names=primitive_names,
-        primitive_costs=primitive_costs,
-        dataset=train_dataset,
-        feature_dim=feature_dim,
-        max_steps=max_steps
-    )
+
+    if load_checkpoint:
+        print("Loading trained agent...")
+        algo = load_agent(
+            checkpoint_dir=checkpoint_dir,
+            primitives=primitive_methods,
+            primitive_costs=primitive_costs,
+            dataset=train_dataset,
+            feature_dim=feature_dim,
+            max_steps=max_steps
+        )
+    else:
+        # Train agent
+        print("Training agent...")
+        algo = train_agent(
+            checkpoint_dir=checkpoint_dir,
+            primitives=primitive_methods,
+            primitive_names=primitive_names,
+            primitive_costs=primitive_costs,
+            dataset=train_dataset,
+            feature_dim=feature_dim,
+            max_steps=max_steps
+        )
     
 
     # Evaluate agent
