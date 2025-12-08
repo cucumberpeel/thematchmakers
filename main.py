@@ -27,7 +27,7 @@ primitives = [
     ("light_stem", light_stem_algorithm, 'light')
 ]
 
-def evaluate_rl_method(train_file_path, test_file_path, load_checkpoint=True, checkpoint_dir="model_checkpoint"):
+def evaluate_rl_method(train_file_path, test_file_path, load_checkpoint=False, checkpoint_dir="model_checkpoint"):
     checkpoint_dir = os.path.join(os.path.dirname(__file__), checkpoint_dir)
     primitive_names = [name for name, _, _ in primitives]
     primitive_methods = [method for _, method, _ in primitives]
@@ -41,6 +41,7 @@ def evaluate_rl_method(train_file_path, test_file_path, load_checkpoint=True, ch
         algo = load_agent(
             checkpoint_dir=checkpoint_dir,
             primitives=primitive_methods,
+            primitive_names=primitive_names,
             primitive_costs=primitive_costs,
             dataset=train_file_path,
             feature_dim=feature_dim,
