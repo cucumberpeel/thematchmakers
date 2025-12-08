@@ -5,3 +5,6 @@ scikit-learn
 bdi-kit
 rapidfuzz
 ray[rllib]
+dm-tree
+"ray[tune]"
+lz4

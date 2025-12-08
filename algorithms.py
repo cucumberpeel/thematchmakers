@@ -1,10 +1,7 @@
 import re
 from difflib import SequenceMatcher
-import ipaddress
-import math
 from urllib.parse import urlparse, urlunparse
 import unicodedata, re
-import warnings
 
 
 import pandas as pd
@@ -209,170 +206,6 @@ def regex_algorithm(source, targets, flags=re.IGNORECASE):
 
     return None
 
-def ip_matcher(source, targets, cidr_map=None, prefix=24, **kw):
-    """Unified IP matcher.
-
-    - If `cidr_map` is provided: treat `targets` as country labels and return
-      the country whose CIDR contains `source` (longest-prefix match).
-    - If `cidr_map` is not provided: treat `targets` as IP addresses and
-      return the first target in the same `/prefix` subnet as `source`.
-
-    Always return a single matched value or `None`.
-    """
-    # validate source
-    try:
-        ip_addr = ipaddress.ip_address(str(source))
-    except Exception:
-        return None
-
-    # CIDR map mode: return country label
-    if cidr_map:
-        best_country, best_prefix = None, -1
-        for country, cidrs in cidr_map.items():
-            for c in cidrs:
-                try:
-                    net = ipaddress.ip_network(c, strict=False)
-                except Exception:
-                    continue
-                if ip_addr in net and net.prefixlen > best_prefix:
-                    best_prefix, best_country = net.prefixlen, country
-        return best_country if best_country in set(map(str, targets)) else None
-
-    # Subnet mode: match IP targets by subnet
-    try:
-        net_src = ipaddress.ip_network(f"{source}/{prefix}", strict=False)
-    except Exception:
-        return None
-
-    for t in targets:
-        try:
-            if ipaddress.ip_network(f"{t}/{prefix}", strict=False) == net_src:
-                return t
-        except Exception:
-            continue
-    return None
-
-def date_algorithm(source, targets, date_only=True, tolerance=None):
-    """
-    - date_only=True → compare calendar dates (ignore time-of-day)
-    - tolerance=None → exact equality; else pd.Timedelta like '1D' or '2H'
-    """
-    try:
-        # Suppress pandas' "Could not infer format" UserWarning which is
-        # noisy when parsing heterogeneous date formats. We only ignore
-        # that specific warning here; other warnings will still surface.
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Could not infer format",
-                category=UserWarning,
-            )
-            s = pd.to_datetime(pd.Series([source]), errors="coerce", utc=True)
-            t = pd.to_datetime(pd.Series(list(targets)), errors="coerce", utc=True)
-
-        if date_only:
-            s = s.dt.normalize()
-            t = t.dt.normalize()
-
-        s_val = s.iloc[0]
-        if pd.isna(s_val):
-            return None
-
-        if tolerance is None:
-            mask = t.eq(s_val)
-            if mask.any():
-                idx = int(mask.idxmax())
-                return targets[idx]
-            return None
-        else:
-            diff = (t - s_val).abs()
-            ok = diff <= pd.to_timedelta(tolerance)
-            if ok.any():
-                idx = int(diff[ok].idxmin())
-                return targets[idx]
-            return None
-    except Exception:
-        # Swallow any parsing/processing errors and return None instead of
-        # allowing an exception to propagate and trigger error printing elsewhere.
-        return None
-
-
-def numeric_family_algorithm(source, targets, abs_tol=None, rel_tol=1e-3):
-    """Unified numeric matcher.
-
-    Handles plain numbers, currency-formatted values (e.g. "$1,234.56"),
-    and percentages (e.g. "12%" or "12.3 %"). The function strips common
-    symbols (`,`, `$`, `€`, `£`, `%`), parses numeric values (including
-    parentheses-as-negative), and then compares values using an absolute
-    and relative tolerance. If `abs_tol` is None, sensible defaults are used
-    per-type (currency/percent vs raw number).
-    Returns the first matching target that satisfies the tolerance, or None.
-    """
-    def parse(x):
-        if x is None:
-            return None, None
-        s = str(x).strip()
-        if s == "":
-            return None, None
-
-        is_percent = "%" in s
-        is_currency = any(ch in s for ch in ("$", "€", "£"))
-
-        # remove thousands separators and currency/percent symbols
-        s2 = s.replace(",", "")
-        s2 = s2.replace("$", "").replace("€", "").replace("£", "")
-        s2 = s2.replace("%", "")
-
-        # parentheses as negative: (1,234) -> -1234
-        if re.match(r"^\(.*\)$", s2):
-            s2 = "-" + s2[1:-1].strip()
-
-        try:
-            val = float(s2)
-        except Exception:
-            return None, None
-
-        typ = 'number'
-        if is_currency:
-            typ = 'currency'
-        elif is_percent:
-            typ = 'percent'
-            val = val / 100.0
-
-        return val, typ
-
-    s_val, s_type = parse(source)
-    if s_val is None:
-        return None
-
-    # default absolute tolerances when not provided
-    def default_abs(t):
-        if t == 'currency':
-            return 1e-2
-        if t == 'percent':
-            return 1e-3
-        return 1e-6
-
-    for t in targets:
-        t_val, t_type = parse(t)
-        if t_val is None:
-            continue
-
-        # Decide comparison type: if either is currency -> currency, elif either percent -> percent
-        comp_type = 'number'
-        if 'currency' in (s_type, t_type):
-            comp_type = 'currency'
-        elif 'percent' in (s_type, t_type):
-            comp_type = 'percent'
-
-        tol_abs = default_abs(comp_type) if abs_tol is None else abs_tol
-        tol_rel = rel_tol
-
-        err = abs(s_val - t_val)
-        if err <= max(tol_abs, tol_rel * max(abs(s_val), abs(t_val))):
-            return t
-    return None
-
 
 def identity_algorithm(source, targets):
     if source in targets:
@@ -392,49 +225,15 @@ def categorical_algorithm(source, targets):
     return None
 
 def boolean_algorithm(source, targets):
-    true_set = {"true", "1", "yes", "y", "t"}
-    false_set = {"false", "0", "no", "n", "f"}
-    src_val = str(source).strip().lower()
-    if src_val in true_set:
-        src_bool = True
-    elif src_val in false_set:
-        src_bool = False
-    else:
-        return None
-    for t in targets:
-        tgt_val = str(t).strip().lower()
-        if tgt_val in true_set and src_bool is True:
-            return t
-        elif tgt_val in false_set and src_bool is False:
-            return t
+    # Removed per user request
     return None
 
 def phone_algorithm(source, targets):
-    def normalize_phone(p):
-        digits = re.sub(r"\D", "", str(p))
-        return digits[-10:] if len(digits) >= 10 else None
-    src_phone = normalize_phone(source)
-    if src_phone is None:
-        return None
-    for t in targets:
-        tgt_phone = normalize_phone(t)
-        if tgt_phone == src_phone:
-            return t
+    # Removed per user request
     return None
 
 def email_algorithm(source, targets):
-    def norm(e):
-        e = str(e).strip().lower()
-        if "@" not in e: return None
-        local, dom = e.split("@", 1)
-        if dom in ("gmail.com", "googlemail.com"):
-            local = local.split("+", 1)[0].replace(".", "")
-        return f"{local}@{dom}"
-    s = norm(source)
-    if not s: return None
-    for t in targets:
-        if norm(t) == s:
-            return t
+    # Removed per user request
     return None
 
 
@@ -471,36 +270,6 @@ def name_algorithm(source, targets):
 # These simple canonicalizers were removed to reduce primitive count
 # and rely on more flexible text/regex methods.
 
-def zip_algorithm(source, targets):
-    def norm(z):
-        d = re.sub(r"\D", "", str(z))
-        return d[:5] if len(d)>=5 else None
-    s = norm(source)
-    if not s: return None
-    for t in targets:
-        if norm(t) == s:
-            return t
-    return None
-
-
-def credit_card_algorithm(source, targets):
-    def norm_cc(c):
-        digits = re.sub(r"\D", "", str(c))
-        return digits if 12 <= len(digits) <= 19 and _luhn_ok(digits) else None
-    def _luhn_ok(d):
-        s = 0; alt = False
-        for ch in d[::-1]:
-            n = int(ch)
-            if alt:
-                n = n*2; n -= 9 if n > 9 else 0
-            s += n; alt = not alt
-        return s % 10 == 0
-    s = norm_cc(source)
-    if not s: return None
-    for t in targets:
-        if norm_cc(t) == s:
-            return t
-    return None
 
 
 def ssn_algorithm(source, targets):
@@ -516,50 +285,12 @@ def ssn_algorithm(source, targets):
     return None
 
 def isbn_algorithm(source, targets):
-    def norm(i):
-        s = re.sub(r"[\s-]", "", str(i)).upper()
-        if _isbn13_ok(s): return _to_isbn13(s)  # canonicalize to 13
-        if _isbn10_ok(s): return _to_isbn13(s)
-        return None
-    def _isbn10_ok(s):
-        if len(s)!=10: return False
-        total=0
-        for i,ch in enumerate(s[:9],1):
-            if not ch.isdigit(): return False
-            total += i*int(ch)
-        checksum = s[9]
-        total += 10 if checksum=="X" else (int(checksum) if checksum.isdigit() else 0)
-        return total % 11 == 0
-    def _isbn13_ok(s):
-        if len(s)!=13 or not s.isdigit(): return False
-        total = sum((int(d)*(1 if i%2==0 else 3)) for i,d in enumerate(s[:12]))
-        return (10 - total%10) % 10 == int(s[12])
-    def _to_isbn13(s):
-        if len(s)==13: return s
-        # convert 10->13
-        core = "978"+s[:-1]
-        total = sum((int(d)*(1 if i%2==0 else 3)) for i,d in enumerate(core))
-        chk = (10 - total%10) % 10
-        return core + str(chk)
-    s = norm(source)
-    if not s: return None
-    for t in targets:
-        if norm(t) == s:
-            return t
+    # Removed per user request
     return None
 
 
 def mac_address_algorithm(source, targets):
-    def norm(m):
-        m = re.sub(r"[^0-9a-fA-F]", "", str(m))
-        if len(m) != 12: return None
-        m = m.lower()
-        return ":".join(m[i:i+2] for i in range(0, 12, 2))
-    s = norm(source)
-    if not s: return None
-    for t in targets:
-        if norm(t) == s:
-            return t
+    # Removed per user request
     return None
 
 
@@ -580,35 +311,6 @@ def color_algorithm(source, targets):
 # Removed: hex_color_algorithm
 # Hex colour canonicalization removed in favor of a single `hex_algorithm` style
 # primitive or external color-matching helpers when needed.
-
-
-def geo_pair_algorithm(source, targets, tol_m=50.0):
-    """
-    source: "lat,lon" or (lat,lon); targets list of same
-    """
-    def parse(x):
-        if isinstance(x, (tuple, list)) and len(x)==2: return float(x[0]), float(x[1])
-        parts = str(x).split(",")
-        if len(parts)!=2: return None
-        try: return float(parts[0]), float(parts[1])
-        except: return None
-    def haversine(p,q):
-        R=6371000.0
-        lat1,lon1 = map(math.radians, p)
-        lat2,lon2 = map(math.radians, q)
-        dlat=lat2-lat1; dlon=lon2-lon1
-        a=math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
-        return 2*R*math.asin(math.sqrt(a))
-    s = parse(source)
-    if not s: return None
-    best=None; best_d=1e18
-    for t in targets:
-        q = parse(t)
-        if not q: continue
-        d = haversine(s,q)
-        if d <= tol_m and d < best_d:
-            best, best_d = t, d
-    return best
 
 def filepath_algorithm(source, targets):
     def normalize_filepath(f):
@@ -650,130 +352,6 @@ def hex_algorithm(source, targets):
 # Removed: hex_algorithm
 # Use external color/hex matching utilities or keep hex normalization
 # in feature engineering if needed.
-
-
-def unit_normalizer_algorithm(source, targets, abs_tol=0.1, rel_tol=1e-2):
-    """Unified unit-aware matcher.
-
-    Detects numeric values and units in `source` and `targets`. Supports
-    length (in, cm), weight (kg, lb) and temperature (C, F) conversions.
-    Returns the first target that, after normalization/conversion, matches
-    the source within the provided tolerances. If no unit information is
-    found or no match within tolerance, returns None.
-    """
-    def parse_value_unit(x):
-        if x is None:
-            return None, None
-        s = str(x).strip()
-        # find first numeric substring
-        m = re.search(r"[+-]?\d+[\d,\.]*?(?:[eE][+-]?\d+)?", s)
-        if not m:
-            return None, None
-        num_str = m.group(0)
-        # normalize number (remove commas)
-        num_norm = num_str.replace(",", "")
-        try:
-            val = float(num_norm)
-        except Exception:
-            return None, None
-
-        # unit is the remainder after the number
-        unit_part = s[m.end():].strip().lower()
-        # also check prefix unit like 'kg 5' (rare)
-        if not unit_part:
-            prefix = s[:m.start()].strip().lower()
-            if prefix:
-                unit_part = prefix
-
-        # clean unit string
-        unit_part = re.sub(r'[^a-zA-Z°"\'º%]+', '', unit_part)
-        return val, unit_part or None
-
-    def unit_type_and_canonical(u):
-        if not u:
-            return None, None
-        u = u.lower().replace('.', '').replace('\u00ba', 'o')
-        # length
-        if any(k in u for k in ["cm", "cent", "centi"]):
-            return 'length', 'cm'
-        if any(k in u for k in ["in", 'inch', '″', '"', "inch"]):
-            return 'length', 'in'
-        # weight
-        if any(k in u for k in ["kg", "kilog", "kilogram"]):
-            return 'weight', 'kg'
-        if any(k in u for k in ["lb", "lbs", "pound", "pounder"]):
-            return 'weight', 'lb'
-        # temperature
-        if 'c' == u or 'c' in u or '°c' in u or 'degc' in u:
-            return 'temp', 'C'
-        if 'f' == u or 'f' in u or '°f' in u or 'degf' in u:
-            return 'temp', 'F'
-        return None, None
-
-    def convert_to(val, from_unit, to_unit, utype):
-        if val is None or from_unit is None or to_unit is None:
-            return None
-        if utype == 'length':
-            if from_unit == to_unit:
-                return val
-            if from_unit == 'in' and to_unit == 'cm':
-                return val * 2.54
-            if from_unit == 'cm' and to_unit == 'in':
-                return val / 2.54
-        if utype == 'weight':
-            if from_unit == to_unit:
-                return val
-            if from_unit == 'kg' and to_unit == 'lb':
-                return val * 2.20462
-            if from_unit == 'lb' and to_unit == 'kg':
-                return val / 2.20462
-        if utype == 'temp':
-            if from_unit == to_unit:
-                return val
-            if from_unit == 'C' and to_unit == 'F':
-                return val * 9.0 / 5.0 + 32.0
-            if from_unit == 'F' and to_unit == 'C':
-                return (val - 32.0) * 5.0 / 9.0
-        return None
-
-    s_val, s_unit_raw = parse_value_unit(source)
-    s_type, s_unit = unit_type_and_canonical(s_unit_raw)
-
-    for t in targets:
-        t_val, t_unit_raw = parse_value_unit(t)
-        t_type, t_unit = unit_type_and_canonical(t_unit_raw)
-
-        # If both have recognized unit types and they match, try direct compare
-        if s_val is not None and t_val is not None and s_type and t_type and s_type == t_type:
-            utype = s_type
-            # choose sensible tolerances
-            tol_abs = abs_tol if utype in ('length', 'weight') else 0.5
-            tol_rel = rel_tol
-
-            # convert source to target unit and compare
-            if s_unit and t_unit:
-                s_in_t = convert_to(s_val, s_unit, t_unit, utype)
-                if s_in_t is not None:
-                    err = abs(s_in_t - t_val)
-                    if err <= max(tol_abs, tol_rel * max(abs(s_in_t), abs(t_val))):
-                        return t
-                # convert target to source unit and compare
-                t_in_s = convert_to(t_val, t_unit, s_unit, utype)
-                if t_in_s is not None:
-                    err = abs(t_in_s - s_val)
-                    if err <= max(tol_abs, tol_rel * max(abs(t_in_s), abs(s_val))):
-                        return t
-            else:
-                # If units missing but same type, compare numeric values scaled if needed
-                err = abs(s_val - t_val)
-                if err <= max(tol_abs, tol_rel * max(abs(s_val), abs(t_val))):
-                    return t
-
-    return None
-
-
-# The old specific unit conversion functions were removed in favor of
-# `unit_normalizer_algorithm`. Call that single algorithm where needed.
 
 def accent_fold_algorithm(source, targets):
     def fold(s):

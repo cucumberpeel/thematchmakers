@@ -2,11 +2,10 @@ import os
 from agent_lab import train_agent, load_agent, evaluate_agent
 from dataset_formatter import read_split_datasets
 from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
-shingles_algorithm, regex_algorithm, ip_matcher, date_algorithm,
-numeric_family_algorithm, identity_algorithm, categorical_algorithm, boolean_algorithm, phone_algorithm, email_algorithm,
-url_algorithm, geo_pair_algorithm, zip_algorithm, credit_card_algorithm, ssn_algorithm, isbn_algorithm, mac_address_algorithm,
+shingles_algorithm, regex_algorithm, identity_algorithm, categorical_algorithm,
+url_algorithm, ssn_algorithm,
 filepath_algorithm, uuid_algorithm,
-unit_normalizer_algorithm, accent_fold_algorithm,
+accent_fold_algorithm,
 light_stem_algorithm)
 from feature_extractor import FEATURE_DIM
 
@@ -18,24 +17,12 @@ primitives = [
     ("llm", llm_reasoning_algorithm, 'expensive'),
     ("shingles", shingles_algorithm, 'light'),
     ("regex", regex_algorithm, 'moderate'),
-    ("ip", ip_matcher, 'light'),
-    ("date", date_algorithm, 'light'),
-    ("numeric_family", numeric_family_algorithm, 'light'),
     ("identity", identity_algorithm, 'light'),
     ("categorical", categorical_algorithm, 'light'),
-    ("boolean", boolean_algorithm, 'light'),
-    ("phone", phone_algorithm, 'light'),
-    ("email", email_algorithm, 'light'),
     ("url", url_algorithm, 'light'),
-    ("geo_pair", geo_pair_algorithm, 'light'),
-    ("zip", zip_algorithm, 'light'),
-    ("credit_card", credit_card_algorithm, 'light'),
     ("ssn", ssn_algorithm, 'light'),
-    ("isbn", isbn_algorithm, 'light'),
-    ("mac_address", mac_address_algorithm, 'light'),
     ("filepath", filepath_algorithm, 'light'),
     ("uuid", uuid_algorithm, 'light'),
-    ("unit_normalizer", unit_normalizer_algorithm, 'light'),
     ("accent_fold", accent_fold_algorithm, 'light'),
     ("light_stem", light_stem_algorithm, 'light')
 ]
