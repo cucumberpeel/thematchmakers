@@ -44,18 +44,53 @@ def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, da
     config = make_config(primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps)
     algo = config.build()
 
+    best_reward = float('-inf')
+    best_iteration = 0
+
     for i in range(100):
         print(f"Iteration {i}")
         result = algo.train()
-        # Print available keys on first iteration to debug
-        if i == 0:
-            print(f"Available result keys: {list(result.keys())}")
+        
+        if 'env_runners' in result:
+            env_metrics = result['env_runners']
+            reward_mean = env_metrics.get('episode_reward_mean', float('-inf'))
+            episode_len_mean = env_metrics.get('episode_len_mean', 0)
+            num_episodes = env_metrics.get('num_episodes', 0)
+            
+            print(f"Reward Mean: {reward_mean:.3f}")
+            print(f"Episode Length: {episode_len_mean:.2f} steps")
+            print(f"Episodes: {num_episodes}")
+            
+            # Check if this is the best performance so far
+            if reward_mean > best_reward:
+                best_reward = reward_mean
+                best_iteration = i
+                
+                # Save the best checkpoint
+                print(f"NEW BEST REWARD: {best_reward:.3f} at iteration {best_iteration}")
+                print(f"Saving best checkpoint to: {checkpoint_dir}")
+             
+                algo.save(checkpoint_dir=checkpoint_dir)
 
-        if "episode_reward_mean" in result:
-            reward = result["episode_reward_mean"]
-            print(f"Reward = {reward}")
+            else:
+                print(f"Current best: {best_reward:.3f} (iteration {best_iteration})")
+        
+        if 'info' in result and 'learner' in result['info']:
+            learner_info = result['info']['learner']
+            if 'default_policy' in learner_info:
+                policy_stats = learner_info['default_policy']
+                if 'learner_stats' in policy_stats:
+                    stats = policy_stats['learner_stats']
+                    print(f"Policy Loss: {stats.get('total_loss', 'N/A')}")
+                    print(f"Policy Entropy: {stats.get('entropy', 'N/A')}")
 
-    algo.save(checkpoint_dir=checkpoint_dir)
+        # Early stopping if reward is very good
+        if reward_mean > 0.85:  # 85% success rate
+            print(f"CONVERGED! Reward > 0.85")
+            print(f"Stopping early at iteration {i}")
+            break
+    
+    algo.restore(checkpoint_dir)
 
     return algo
 
