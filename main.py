@@ -1,4 +1,5 @@
 import os
+import sys
 from agent_lab import train_agent, load_agent, evaluate_agent
 from dataset_formatter import read_split_datasets, save_formatted_datasets
 from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
@@ -29,6 +30,7 @@ primitives = [
 
 def evaluate_rl_method(train_file_path, test_file_path, load_checkpoint=False, checkpoint_dir="model_checkpoint"):
     checkpoint_dir = os.path.join(os.path.dirname(__file__), checkpoint_dir)
+    os.makedirs(checkpoint_dir, exist_ok=True)
     primitive_names = [name for name, _, _ in primitives]
     primitive_methods = [method for _, method, _ in primitives]
     primitive_costs = [general_costs[cost] for _, _, cost in primitives]
@@ -108,10 +110,36 @@ def evaluate_individual_methods(test_dataset):
         )
 
 if __name__ == "__main__":
-    train_dataset, test_dataset = read_split_datasets(autofj=True, ss=False, wt=False, kbwt=False)
-    train_file_path, test_file_path = save_formatted_datasets(train_dataset, test_dataset, "formatted_datasets")
+    dataset_arg = sys.argv[1].lower()
+
+    # Map argument → parameters for read_split_datasets
+    dataset_flags = {
+        "autofj":  {"autofj": True,  "ss": False, "wt": False, "kbwt": False},
+        "ss":      {"autofj": False, "ss": True,  "wt": False, "kbwt": False},
+        "wt":      {"autofj": False, "ss": False, "wt": True,  "kbwt": False},
+        "kbwt":    {"autofj": False, "ss": False, "wt": False, "kbwt": True}
+    }
+
+    if dataset_arg not in dataset_flags:
+        raise ValueError(
+            f"Unknown dataset '{dataset_arg}'. "
+            "Choose from: autofj, ss, wt, kbwt."
+        )
+
+    # --- Read dataset ---
+    flags = dataset_flags[dataset_arg]
+
+    train_dataset, test_dataset = read_split_datasets(
+        autofj = flags["autofj"],
+        ss     = flags["ss"],
+        wt     = flags["wt"],
+        kbwt   = flags["kbwt"]
+    )
+    formatted_dataset_dir = "formatted_datasets" + "/" + dataset_arg
+    train_file_path, test_file_path = save_formatted_datasets(train_dataset, test_dataset, formatted_dataset_dir)
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Test dataset size: {len(test_dataset)}")
 
     #evaluate_individual_methods(test_dataset)
-    evaluate_rl_method(train_file_path, test_file_path)
+    checkpoint_dir = f"model_checkpoints/{dataset_arg}"
+    evaluate_rl_method(train_file_path, test_file_path, checkpoint_dir=checkpoint_dir)
