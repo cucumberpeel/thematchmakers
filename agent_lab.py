@@ -4,7 +4,7 @@ import logging
 from agent_environment import ValueMatchingEnv
 from ray.rllib.algorithms.ppo import PPOConfig
 
-def make_config(primitives, primitive_costs, dataset, feature_dim, max_steps):
+def make_config(primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps):
     config = (
         PPOConfig()
         .environment(
@@ -12,6 +12,7 @@ def make_config(primitives, primitive_costs, dataset, feature_dim, max_steps):
             env_config={
                 "dataset": dataset,
                 "primitives": primitives,
+                "primitive_names": primitive_names,
                 "costs": primitive_costs,
                 "feature_dim": feature_dim,
                 "max_steps": max_steps
@@ -23,7 +24,7 @@ def make_config(primitives, primitive_costs, dataset, feature_dim, max_steps):
             enable_env_runner_and_connector_v2=False
         )
         .env_runners(
-            num_env_runners=16,  # Number of parallel workers
+            num_env_runners=1,  # Number of parallel workers
             rollout_fragment_length="auto",  # Collect more samples per rollout
             sample_timeout_s=120,
         )
@@ -40,10 +41,10 @@ def make_config(primitives, primitive_costs, dataset, feature_dim, max_steps):
 
 def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps):
     ray.init(local_mode=True, logging_level=logging.DEBUG)
-    config = make_config(primitives, primitive_costs, dataset, feature_dim, max_steps)
+    config = make_config(primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps)
     algo = config.build()
 
-    for i in range(200):
+    for i in range(100):
         print(f"Iteration {i}")
         result = algo.train()
         # Print available keys on first iteration to debug
@@ -58,9 +59,9 @@ def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, da
 
     return algo
 
-def load_agent(checkpoint_dir, primitives, primitive_costs, dataset, feature_dim, max_steps):
+def load_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps):
     ray.init(local_mode=True, logging_level=logging.DEBUG)
-    config = make_config(primitives, primitive_costs, dataset, feature_dim, max_steps)
+    config = make_config(primitives, primitive_names, primitive_costs, dataset, feature_dim, max_steps)
     algo = config.build()
     algo.restore(checkpoint_dir)
 
@@ -83,6 +84,7 @@ def evaluate_agent(algo, primitives, primitive_names, primitive_costs, test_data
         # Create a temporary env for this episode
         env = ValueMatchingEnv({
             'primitives': primitives,
+            'primitive_names': primitive_names,
             'costs': primitive_costs,
             'dataset': [sample],
             'feature_dim': feature_dim,
