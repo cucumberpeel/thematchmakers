@@ -9,6 +9,7 @@ class ValueMatchingEnv(gym.Env):
     def __init__(self, env_config):
         super(ValueMatchingEnv, self).__init__()
         self.primitives = env_config['primitives']
+        self.primitive_names = env_config['primitive_names']
         self.costs = env_config["costs"]
         self.dataset_path = env_config['dataset']
         self.feature_dim = env_config['feature_dim']
@@ -59,7 +60,7 @@ class ValueMatchingEnv(gym.Env):
 
         if action in self.action_history[:self.steps_taken-1]:  # Check previous actions only
             # Penalize heavily for selecting an already-used action
-            reward = -0.5
+            reward = -100
             done = True
             truncated = False
             next_state = self._build_observation()
@@ -71,14 +72,12 @@ class ValueMatchingEnv(gym.Env):
                 'history': self.action_history,
                 'invalid_action': True
             }
-            
+            print(f"[Repeated] Step {self.steps_taken}: Action={self.primitive_names[action]}, Source={self.source}, Predicted=None, Gold={self.gold}, Correct=False, Reward={reward:.2f}")
+
             return next_state, reward, done, truncated, info
 
-        # For LLM action, assume worst-case (wrong) prediction instead of
-        # the previous oracle behaviour that returned the gold label.
-        # This prevents the agent from learning to always pick the LLM.
-        if action == 2:  # LLM reasoning
-            predicted = None
+        if self.primitive_names[action] == 'llm': # Special case for LLM reasoning during training
+            predicted = self.gold
         else:
             predicted = self.primitives[action](self.source, self.targets)
 
@@ -87,7 +86,7 @@ class ValueMatchingEnv(gym.Env):
         action_cost = self.costs[action]
         # Compute reward with decay based on attempts
         if is_correct:
-            reward = 1.0 - 0.2 * (self.steps_taken - 1)  # Decay: 1.0, 0.8, 0.6
+            reward = 1.0 - 0.3 * (self.steps_taken - 1)  # Decay: 1.0, 0.7, 0.4
             reward -= action_cost
             done = True
         elif self.steps_taken >= self.max_steps:
@@ -107,6 +106,8 @@ class ValueMatchingEnv(gym.Env):
             'attempts': self.steps_taken,
             'history': self.action_history
         }
+
+        print(f"Step {self.steps_taken}: Action={self.primitive_names[action]}, Source={self.source}, Predicted={predicted}, Gold={self.gold}, Correct={is_correct}, Reward={reward:.2f}")
 
         return next_state, reward, done, truncated, info
     
