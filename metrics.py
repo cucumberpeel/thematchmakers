@@ -13,12 +13,12 @@ def _counts(
     for gold, pred in zip(golds, preds):
         if gold is None:
             if pred is None:
-                tn += 1        # correctly predicted "no match"
+                tn += 1        
             else:
-                fp += 1        # predicted a match where none exists
+                fp += 1        
         else:
             if pred is None:
-                fn += 1        # missed an existing match
+                fn += 1        
             elif is_correct(gold, pred):
                 tp += 1
             else:
@@ -63,3 +63,41 @@ def compute_per_method_metrics(
 ) -> Dict[str, Dict[str, float]]:
     return {name: compute_classification_metrics(g, p, is_correct=is_correct)
             for name, (g, p) in method_results.items()}
+
+
+def compute_aggregate_metrics(
+    dataset_results: Dict[str, Dict[str, float]]
+) -> Dict[str, float]:
+    """Aggregate metrics across multiple datasets.
+    
+    Args:
+        dataset_results: Map of dataset_name -> metrics dict (accuracy, precision, recall, f1, coverage)
+    
+    Returns:
+        Dictionary with mean and std for each metric across datasets.
+    """
+    if not dataset_results:
+        return {}
+    
+    import numpy as np
+    
+    # Collect all metric values across datasets
+    all_accuracies = [m["accuracy"] for m in dataset_results.values()]
+    all_precisions = [m["precision"] for m in dataset_results.values()]
+    all_recalls = [m["recall"] for m in dataset_results.values()]
+    all_f1s = [m["f1"] for m in dataset_results.values()]
+    all_coverages = [m["coverage"] for m in dataset_results.values()]
+    
+    return {
+        "accuracy_mean": float(np.mean(all_accuracies)),
+        "accuracy_std": float(np.std(all_accuracies)),
+        "precision_mean": float(np.mean(all_precisions)),
+        "precision_std": float(np.std(all_precisions)),
+        "recall_mean": float(np.mean(all_recalls)),
+        "recall_std": float(np.std(all_recalls)),
+        "f1_mean": float(np.mean(all_f1s)),
+        "f1_std": float(np.std(all_f1s)),
+        "coverage_mean": float(np.mean(all_coverages)),
+        "coverage_std": float(np.std(all_coverages)),
+        "num_datasets": len(dataset_results),
+    }
