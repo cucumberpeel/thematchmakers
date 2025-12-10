@@ -4,15 +4,130 @@ from urllib.parse import urlparse, urlunparse
 import unicodedata, re
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-
-
 import pandas as pd
+import json_repair
+import warnings
+import json
+import hashlib
+from pathlib import Path
+from litellm import completion
+
 try:
     import bdikit as bdi
 except Exception:
     bdi = None
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
+
+
+class LLM():
+    """A value matcher that uses LLM to match values based on their similarity."""
+    def __init__(
+        self,
+        model_name: str = "deepinfra/openai/gpt-oss-120b",
+        threshold: float = 0.5,
+        cache_file: str = "llm_cache.json",
+        **model_kwargs,
+    ):
+        self.model_name = model_name
+        self.threshold = threshold
+        self.model_kwargs = model_kwargs
+        self.cache_file = Path(cache_file)
+        self.cache = self._load_cache()
+    
+    def _load_cache(self):
+        """Load cache from JSON file if it exists."""
+        if self.cache_file.exists():
+            try:
+                with open(self.cache_file, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                warnings.warn(
+                    f"Cache file {self.cache_file} is corrupted. Starting with empty cache.",
+                    UserWarning,
+                )
+                return {}
+        return {}
+    
+    def _save_cache(self):
+        """Save cache to JSON file."""
+        try:
+            with open(self.cache_file, 'w') as f:
+                json.dump(self.cache, f, indent=2)
+        except Exception as e:
+            warnings.warn(
+                f"Failed to save cache to {self.cache_file}: {e}",
+                UserWarning,
+            )
+    
+    def _generate_cache_key(self, source_value, target_values):
+        """Generate a hash key for caching based on source value and target values."""
+        # Sort target values to ensure consistent hashing regardless of order
+        sorted_targets = sorted(target_values)
+        # Create a string representation of the input
+        cache_input = f"{source_value}|{'|'.join(sorted_targets)}"
+        # Generate SHA256 hash
+        return hashlib.sha256(cache_input.encode('utf-8')).hexdigest()
+    
+    def match_values(
+        self,
+        source_column,
+        target_column,
+        source_value,
+        target_values,
+    ):
+        # Generate cache key
+        cache_key = self._generate_cache_key(source_value, target_values)
+        
+        # Check if result exists in cache
+        if cache_key in self.cache:
+            print(f"Cache hit for '{source_value}'")
+            return self.cache[cache_key]
+        
+        # If not in cache, call LLM
+        print(f"Cache miss for '{source_value}', calling LLM...")
+        target_values_set = set(target_values)
+        response = completion(
+            model=self.model_name,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an intelligent system that given a term, you have to choose a value from a list that best matches the term.",
+                },
+                {
+                    "role": "user",
+                    "content": f"For the term: '{source_value}' from column '{source_column}', choose a value from this list {target_values} from column '{target_column}'. "
+                    "Return the value from the list with a similarity score, between 0 and 1, with 1 indicating the highest similarity. "
+                    "DO NOT PROVIDE ANY OTHER OUTPUT TEXT OR EXPLANATION. "
+                    'Only provide a Python dictionary. For example {"term": "term from the list", "score": 0.8}.',
+                },
+            ],
+            **self.model_kwargs,
+        )
+        response_message = response.choices[0].message.content
+        matched_value = None
+        
+        try:
+            response_dict = json_repair.loads(response_message)
+            target_value = response_dict["term"]
+            score = float(response_dict["score"])
+            if target_value in target_values_set and score >= self.threshold:
+                matched_value = target_value
+        except:
+            warnings.warn(
+                f'Errors parsing response for "{source_value}": {response_message}',
+                UserWarning,
+            )
+        
+        # Cache only the matched value
+        self.cache[cache_key] = matched_value
+        self._save_cache()
+        
+        return matched_value
+
+
+
+llm_obj = LLM()
 
 def lexical_algorithm(source, targets):
     # Use bdikit edit-distance matcher if available, otherwise fallback
@@ -63,29 +178,10 @@ def semantic_algorithm(source, targets):
     return best_target
     
 
-def llm_reasoning_algorithm(source, targets):
-    # LLM reasoning is disabled for now to avoid oracle behaviour during
-    # training. The original implementation (using bdikit) is commented
-    # out below for reference. Instead return a neutral response with a
-    # zero reward so the RL agent does not learn to prefer the LLM action.
-    #
-    # Original implementation:
-    # source_column = 'source'
-    # target_column = 'target'
-    # source_dataset = pd.DataFrame({source_column: [source] })
-    # target_dataset = pd.DataFrame({ target_column: targets })
-    # print("WARNING: Use LLM reasoning only in production")
-    # matches = bdi.match_values(
-    #                         source_dataset,
-    #                         target_dataset,
-    #                         attribute_matches=(source_column, target_column),
-    #                         method="llm",
-    #                         method_args={"model_name": "deepinfra/openai/gpt-oss-120b"}
-    #                     )
-    # return matches["target_value"].iloc[0]
-
-    # Neutral stub: no prediction, zero score, and explicit zero reward
-    return None
+def llm_reasoning_algorithm(source_value, target_values, source_column="source", target_column="target"):
+    match = llm_obj.match_values(source_column, target_column, source_value, target_values)
+    print(f"LLM Reasoning Match: {match}")
+    return match
 
 
 def shingles_algorithm(source, targets, k=3):
@@ -379,8 +475,5 @@ def light_stem_algorithm(source, targets):
         if light(t) == s:
             return t
     return None
-
-
-
 
 
