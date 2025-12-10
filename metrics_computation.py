@@ -139,7 +139,7 @@ def main():
         f.write(f"\n\n{'='*80}\n")
         f.write("AGGREGATE METRICS ACROSS DATASETS (per method)\n")
         f.write(f"{'='*80}\n\n")
-        f.write(f"{'Method':<15} {'F1 Mean':>10} {'F1 Std':>10} {'Acc Mean':>10} {'Acc Std':>10}\n")
+        f.write(f"{'Method':<15} {'Acc Mean':>10} {'Prec Mean':>10} {'Rec Mean':>10} {'F1 Mean':>10}\n")
         f.write("-" * 80 + "\n")
         
         for method_name, _, _ in primitives:
@@ -152,10 +152,10 @@ def main():
                 agg = compute_aggregate_metrics(method_dataset_results)
                 f.write(
                     f"{method_name:<15} "
-                    f"{agg['f1_mean']:>10.3f} "
-                    f"{agg['f1_std']:>10.3f} "
                     f"{agg['accuracy_mean']:>10.3f} "
-                    f"{agg['accuracy_std']:>10.3f}\n"
+                    f"{agg['precision_mean']:>10.3f} "
+                    f"{agg['recall_mean']:>10.3f} "
+                    f"{agg['f1_mean']:>10.3f}\n"
                 )
     
     print(f"\n{'='*80}")
