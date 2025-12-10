@@ -48,7 +48,7 @@ def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, da
     best_iteration = 0
 
     for i in range(100):
-        print(f"Iteration {i}")
+        print(f" Starting iteration {i}")
         result = algo.train()
         
         if 'env_runners' in result:
@@ -58,6 +58,7 @@ def train_agent(checkpoint_dir, primitives, primitive_names, primitive_costs, da
             num_episodes = env_metrics.get('num_episodes', 0)
             episodes_timesteps_total = env_metrics.get('episodes_timesteps_total', 0)
             
+            print(f"Iteration {i} results:")
             print(f"Reward Mean: {reward_mean:.3f}")
             print(f"Episode Length: {episode_len_mean:.2f} steps")
             print(f"Episodes: {num_episodes}")

@@ -14,31 +14,42 @@ try:
 except Exception:
     _HAS_SPACY = False
 
-FEATURE_DIM = 38  # updated to include entity features
+FEATURE_DIM = 16  # updated to include entity features
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
+from collections import Counter
 # Lazy-load spacy model on first use
 _SPACY_NLP = None
+_ALL_NER_LABELS = {}
 
 def _get_nlp():
     global _SPACY_NLP
+    global _ALL_NER_LABELS
     if _SPACY_NLP is None and _HAS_SPACY:
         try:
             _SPACY_NLP = spacy.load("en_core_web_sm")
             print("[feature_extractor] Spacy model 'en_core_web_sm' loaded successfully.")
+            _ALL_NER_LABELS = {l: i for i, l in enumerate(_SPACY_NLP.get_pipe("ner").labels)}
         except Exception as e:
             print(f"[feature_extractor] Failed to load spacy model: {e}")
             pass
     return _SPACY_NLP
 
-def has_entities(text):
-    """Return True if text contains any named entities recognized by spacy."""
+def get_entity(text):
+    """Return the most common named entity recognized by spacy."""
     nlp = _get_nlp()
+
     if nlp is None:
-        return False
+        return -1
     doc = nlp(str(text))
-    return len(doc.ents) > 0
+    entity_ids = [_ALL_NER_LABELS.get(ent.label_, -1) for ent in doc.ents]
+    if len(entity_ids) == 0:
+        return -1
+    
+    most_common = Counter(entity_ids).most_common(1)[0][0]
+    return most_common
 
 def count_entities(text):
     """Return count of named entities in text."""
@@ -99,66 +110,35 @@ def looks_like_address(s):
 def compute_features(source_value, target_values):
     
     # String characteristics
-    length_source = len(source_value)
-    num_words_source = len(source_value.split())
-    is_acronym_source = source_value.isupper()
-    digit_ratio_source = sum(c.isdigit() for c in source_value) / length_source
-    letter_ratio_source = sum(c.isalpha() for c in source_value) / length_source
-
-    is_email_source = looks_like_email(source_value)
-    is_phone_source = looks_like_phone_number(source_value)
-    is_url_source = looks_like_url(source_value)
     is_date_source = looks_like_date(source_value)
     is_numeric_source = looks_like_numeric(source_value)
-    is_ip_source = looks_like_ip_address(source_value)
-    is_currency_source = looks_like_currency(source_value)
-    is_zip_source = looks_like_zip_code(source_value)
     is_name_source = looks_like_name(source_value)
     is_address_source = looks_like_address(source_value)
 
     # Entity recognition features (spacy)
-    source_has_entities = has_entities(source_value)
-    source_entity_count = count_entities(source_value)
+    source_entity = get_entity(source_value)
 
     # Candidate set characteristics
     num_candidates = len(target_values)
     avg_candidate_length = np.mean([len(t) for t in target_values])
-    std_candidate_length = np.std([len(t) for t in target_values])
 
     # Entity features for candidates
-    candidate_entity_flags = [has_entities(t) for t in target_values]
-    candidate_entity_counts = [count_entities(t) for t in target_values]
-    any_candidate_has_entities = any(candidate_entity_flags)
-    frac_candidates_with_entities = sum(candidate_entity_flags) / max(1, len(target_values))
-    max_candidate_entity_count = max(candidate_entity_counts) if candidate_entity_counts else 0
-    mean_candidate_entity_count = np.mean(candidate_entity_counts) if candidate_entity_counts else 0.0
+    candidate_entities = [get_entity(t) for t in target_values[:5]]
+    if len(candidate_entities) == 0:
+        candidate_entity = -1
+    else:
+        candidate_entity = Counter(candidate_entities).most_common(1)[0][0]
 
     features = [
-        length_source,
-        num_words_source,
-        is_acronym_source,
-        digit_ratio_source,
-        letter_ratio_source,
         num_candidates,
         avg_candidate_length,
-        std_candidate_length,
-        is_email_source,
-        is_phone_source,
-        is_url_source,
         is_date_source,
         is_numeric_source,
-        is_ip_source,
-        is_currency_source,
-        is_zip_source,
         is_name_source,
         is_address_source,
         # Entity features
-        source_has_entities,
-        source_entity_count,
-        any_candidate_has_entities,
-        frac_candidates_with_entities,
-        max_candidate_entity_count,
-        mean_candidate_entity_count
+        source_entity,
+        candidate_entity,
     ]
 
     # --- Pairwise lexical features (aggregated across candidate set) ---
@@ -247,24 +227,13 @@ def compute_features(source_value, target_values):
     jaccard_max, jaccard_mean = _agg(token_jaccards)
     lcs_max, lcs_mean = _agg(lcs_norms)
 
-    # For boolean-like features (0/1) we include max (any true) and mean (fraction true)
-    lower_exact_any, lower_exact_frac = _agg(lower_exact_matches)
-    prefix_any, prefix_frac = _agg(prefix_matches)
-    suffix_any, suffix_frac = _agg(suffix_matches)
-
     pairwise_features = [
         lev_max,
         lev_mean,
         jaccard_max,
         jaccard_mean,
         lcs_max,
-        lcs_mean,
-        lower_exact_any,
-        lower_exact_frac,
-        prefix_any,
-        prefix_frac,
-        suffix_any,
-        suffix_frac
+        lcs_mean
     ]
 
     features.extend(pairwise_features)

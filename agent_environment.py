@@ -20,7 +20,7 @@ class ValueMatchingEnv(gym.Env):
 
         # observation_space is used by some RL libraries (e.g. Ray) to initialize neural networks
         self.observation_space = gym.spaces.Box(
-                low=0.0,
+                low=-1.0,
                 high=np.inf,
                 shape=(self.feature_dim + self.max_steps,),
                 dtype=np.float32

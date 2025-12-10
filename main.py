@@ -23,13 +23,7 @@ primitives = [
     ("shingles", shingles_algorithm, 'light'),
     ("regex", regex_algorithm, 'moderate'),
     ("identity", identity_algorithm, 'light'),
-    ("categorical", categorical_algorithm, 'light'),
-    ("url", url_algorithm, 'light'),
-    ("ssn", ssn_algorithm, 'light'),
-    ("filepath", filepath_algorithm, 'light'),
-    ("uuid", uuid_algorithm, 'light'),
-    ("accent_fold", accent_fold_algorithm, 'light'),
-    ("light_stem", light_stem_algorithm, 'light')
+    ("accent_fold", accent_fold_algorithm, 'light')
 ]
 
 def evaluate_rl_method(train_file_path, test_file_path, load_checkpoint=False, checkpoint_dir="model_checkpoint"):
