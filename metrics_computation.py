@@ -12,7 +12,21 @@ import sys
 from datetime import datetime
 from dataset_formatter import read_split_datasets
 from metrics import compute_classification_metrics, compute_aggregate_metrics
-from main import primitives
+from algorithms import (lexical_algorithm, semantic_algorithm, llm_reasoning_algorithm,
+shingles_algorithm, regex_algorithm, identity_algorithm,
+accent_fold_algorithm,)
+
+
+general_costs = {'light': 0.075, 'moderate': 0.15, 'expensive': 0.3}
+primitives = [
+    ("lexical", lexical_algorithm, 'light'), 
+    ("semantic", semantic_algorithm, 'moderate'), 
+    ("llm", llm_reasoning_algorithm, 'expensive'),
+    ("shingles", shingles_algorithm, 'light'),
+    ("regex", regex_algorithm, 'moderate'),
+    ("identity", identity_algorithm, 'light'),
+    ("accent_fold", accent_fold_algorithm, 'light')
+]
 
 
 DATASETS = ["autofj", "ss", "wt", "kbwt"]
@@ -44,7 +58,7 @@ def evaluate_dataset(dataset_name: str, method_name: str, method_func):
         gold_value = sample["gold_value"]
         
         if method_name == "llm":
-            prediction = gold_value  # placeholder
+            prediction = method_func(source_value, target_values, sample["source_column"], sample["target_column"])
         else:
             try:
                 prediction = method_func(source_value, target_values)
