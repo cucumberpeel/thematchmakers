@@ -62,7 +62,7 @@ The program will:
 3. Evaluate the agent's performance on the test set
 4. Output metrics including accuracy, precision, recall, and F1 score
 
-Trained models are saved in the `model_checkpoints/<dataset_name>/` directory.
+Trained models are saved in the `model_checkpoints/<dataset_name>/` directory. Evaluation results and metrics are saved in `metrics_output.txt`.
 
 ## Baseline Results
 
